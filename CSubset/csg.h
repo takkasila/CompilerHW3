@@ -4,35 +4,35 @@
 #include <stdio.h>
 
 /* class & class */
-enum {CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst};
+enum { CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst };
 
 /* form */
-enum {CSGInteger, CSGBoolean, CSGArray, CSGStruct};
+enum { CSGInteger, CSGBoolean, CSGArray, CSGStruct };
 
 typedef struct CSGTypeDesc *CSGType;
 typedef struct CSGNodeDesc *CSGNode;
 
 typedef struct CSGTypeDesc {
-  signed char form;  // integer, array, struct
-  CSGNode fields;  // linked list of the fields in a struct
-  CSGType base;  // base type (array element type)
-  int size;  // total size of the type
-  int len;  // number of array elements
+	signed char form;  // integer, array, struct
+	CSGNode fields;  // linked list of the fields in a struct
+	CSGType base;  // base type (array element type)
+	int size;  // total size of the type
+	int len;  // number of array elements
 } CSGTypeDesc;
 
 typedef struct CSGNodeDesc {
-  signed char class;  // Var, Const, Field, Type, Proc, SProc, Inst
-  signed char lev;  // 0 = global, 1 = local
-  CSGNode next;  // linked list of all objects in same scope
-  CSGNode dsc;  // Proc: link to procedure scope (head)
-  CSGType type;  // type
-  CSSIdent name;  // name
-  long long val;  // Const: value;  Var: address;  SProc: number;  Type: size
-  char op;  // operation of instruction
-  CSGNode x, y;  // the two operands
-  CSGNode prv, nxt;  // previous and next instruction
-  int line;  // line number for printing purposes
-  CSGNode true, false;  // Jmp: true and false chains;  Proc: entry point;
+	signed char class;  // Var, Const, Field, Type, Proc, SProc, Inst
+	signed char lev;  // 0 = global, 1 = local
+	CSGNode next;  // linked list of all objects in same scope
+	CSGNode dsc;  // Proc: link to procedure scope (head)
+	CSGType type;  // type
+	CSSIdent name;  // name
+	long long val;  // Const: value;  Var: address;  SProc: number;  Type: size
+	char op;  // operation of instruction
+	CSGNode x, y;  // the two operands
+	CSGNode prv, nxt;  // previous and next instruction
+	int line;  // line number for printing purposes
+	CSGNode true, false;  // Jmp: true and false chains;  Proc: entry point;
 } CSGNodeDesc;
 
 extern CSGType CSGlongType, CSGboolType;
