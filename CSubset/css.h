@@ -1,12 +1,10 @@
 #ifndef _CSubScan_H_
 #define _CSubScan_H_
 
-enum {
-	CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss, CSSleq, CSSgtr,
-	CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak, CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace,
-	CSSbecomes, CSSnumber, CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct,
-	CSSconst, CSSvoid, CSSeof
-};
+typedef enum {CSStimes, CSSdiv, CSSmod, CSSplus, CSSminus, CSSeql, CSSneq, CSSlss, CSSleq, CSSgtr,
+      CSSgeq, CSSperiod, CSScomma, CSSrparen, CSSrbrak, CSSrbrace, CSSlparen, CSSlbrak, CSSlbrace,
+      CSSbecomes, CSSnumber, CSSident, CSSsemicolon, CSSelse, CSSif, CSSwhile, CSSstruct,
+      CSSconst, CSSvoid, CSSeof, CSSvar, CSSarray, CSSarrayassign} A_oper;
 
 #define CSSidlen 16
 typedef char CSSIdent[CSSidlen];
