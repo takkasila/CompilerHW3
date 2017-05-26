@@ -113,11 +113,11 @@ static void InitProcObj(CSGNode obj, signed char class, CSGNode dsc, CSGType typ
 /*************************************************************************/
 
 
-static void Expression(CSGNode *x, A_exp ast_root);
-static void DesignatorM(CSGNode *x, A_exp ast_root);
+static void Expression(CSGNode *x, A_exp *ast_root);
+static void DesignatorM(CSGNode *x, A_exp *ast_root);
 
 // FINISHED
-static void Factor(CSGNode *x, A_exp ast_root)
+static void Factor(CSGNode *x, A_exp *ast_root)
 {
 	register CSGNode obj;
 
@@ -129,12 +129,13 @@ static void Factor(CSGNode *x, A_exp ast_root)
 		CSGMakeNodeDesc(x, obj);
 		sym = CSSGet();  // consume ident before calling Designator
 
-		ast_root->kind = A_varExp;
-		ast_root->next = NULL;
-		ast_root->u.var = malloc(sizeof(A_var));
-		ast_root->u.var->name = malloc(sizeof(S_symbol));
-		ast_root->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
-		strcpy(ast_root->u.var->name->name, CSSid);
+		(*ast_root)->kind = A_varExp;
+		(*ast_root)->next = NULL;
+		(*ast_root)->desig_next = NULL;
+		(*ast_root)->u.var = malloc(sizeof(A_var));
+		(*ast_root)->u.var->name = malloc(sizeof(S_symbol));
+		(*ast_root)->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+		strcpy((*ast_root)->u.var->name->name, CSSid);
 		// DESIGNATOR
 		DesignatorM(x, ast_root);
 
@@ -143,8 +144,8 @@ static void Factor(CSGNode *x, A_exp ast_root)
 	// NUMBER
 	case CSSnumber:
 
-		ast_root->kind = A_intExp;
-		ast_root->u.intt = CSSval;
+		(*ast_root)->kind = A_intExp;
+		(*ast_root)->u.intt = CSSval;
 		CSGMakeConstNodeDesc(x, CSGlongType, CSSval);
 		sym = CSSGet();
 		break;
@@ -162,7 +163,7 @@ static void Factor(CSGNode *x, A_exp ast_root)
 	}
 }
 
-static void Term(CSGNode *x, A_exp ast_root)
+static void Term(CSGNode *x, A_exp *ast_root)
 {
 	register int op;
 	CSGNode y;
@@ -186,6 +187,7 @@ static void Term(CSGNode *x, A_exp ast_root)
 
 		A_exp factorI = malloc(sizeof(A_exp));
 		factorI->next = NULL;
+		factorI->desig_next = NULL;
 
 		op = sym;
 		sym = CSSGet();
@@ -193,30 +195,33 @@ static void Term(CSGNode *x, A_exp ast_root)
 		assert(y != NULL);
 
 		// Factor
-		Factor(&y, factorI);
+		Factor(&y, &factorI);
 		CSGOp2(op, x, y);
 
 		A_exp expI = malloc(sizeof(A_exp));
 		expI->next = NULL;
+		expI->desig_next = NULL;
 		expI->kind = A_opExp;
-		expI->u.op.left = ast_root;
+		expI->u.op.left = (*ast_root);
 		expI->u.op.oper = operI;
 		expI->u.op.right = factorI;
-		ast_root = expI;
+		(*ast_root) =expI;
 	}
 }
 
-static void SimpleExpression(CSGNode *x, A_exp ast_root)
+static void SimpleExpression(CSGNode *x, A_exp *ast_root)
 {
 	register int op;
 	CSGNode y;
 
-	ast_root->kind = A_opExp;
+	(*ast_root)->kind = A_opExp;
 	A_oper first_oper = malloc(sizeof(A_oper));
 	A_exp left_exp = malloc(sizeof(A_exp));
 	left_exp->next = NULL;
+	left_exp->desig_next = NULL;
 	A_exp right_exp = malloc(sizeof(A_exp));
 	right_exp->next = NULL;
+	right_exp->desig_next = NULL;
 
 	int isHaveInfrontSign = 0;
 
@@ -225,11 +230,8 @@ static void SimpleExpression(CSGNode *x, A_exp ast_root)
 		isHaveInfrontSign = 1;
 
 		// left exp = 0
-		left_exp->kind = A_varExp;
-		left_exp->u.var = malloc(sizeof(A_var));
-		left_exp->u.var->name = malloc(sizeof(S_symbol));
-		left_exp->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
-		strcpy(left_exp->u.var->name->name, "0");
+		left_exp->kind = A_intExp;
+		left_exp->u.intt = 0;
 
 		// oper = +, -
 		first_oper->op = malloc(sizeof(S_symbol));
@@ -244,18 +246,18 @@ static void SimpleExpression(CSGNode *x, A_exp ast_root)
 		
 		// right exp
 		// TERM
-		Term(x, right_exp);
+		Term(x, &right_exp);
 
 		CSGOp1(op, x);
 
-		ast_root->u.op.left = left_exp;
-		ast_root->u.op.oper = first_oper;
-		ast_root->u.op.right = right_exp;
+		(*ast_root)->u.op.left = left_exp;
+		(*ast_root)->u.op.oper = first_oper;
+		(*ast_root)->u.op.right = right_exp;
 	}
 	else {
 
 		// TERM
-		Term(x, left_exp);
+		Term(x, &left_exp);
 	}
 
 	if ((sym == CSSplus) || (sym == CSSminus))
@@ -273,6 +275,7 @@ static void SimpleExpression(CSGNode *x, A_exp ast_root)
 
 			A_exp termI = malloc(sizeof(A_exp));
 			termI->next = NULL;
+			termI->desig_next = NULL;
 
 			op = sym;
 			sym = CSSGet();
@@ -280,19 +283,20 @@ static void SimpleExpression(CSGNode *x, A_exp ast_root)
 			assert(y != NULL);
 
 			// TERM
-			Term(&y, termI);
+			Term(&y, &termI);
 
 			CSGOp2(op, x, y);
 
 
 			A_exp expI = malloc(sizeof(A_exp));
 			expI->next = NULL;
+			expI->desig_next = NULL;
 			expI->kind = A_opExp;
 
-			expI->u.op.left = ast_root;
+			expI->u.op.left = (*ast_root);
 			expI->u.op.oper = operI;
 			expI->u.op.right = termI;
-			ast_root = expI;
+			(*ast_root) =expI;
 
 		}
 	}
@@ -300,44 +304,46 @@ static void SimpleExpression(CSGNode *x, A_exp ast_root)
 	{
 		if (isHaveInfrontSign == 0)
 			// Single Term
-			ast_root = left_exp;
+			(*ast_root) = left_exp;
 	}
 	
 }
 
-static void EqualityExpr(CSGNode *x, A_exp ast_root)
+static void EqualityExpr(CSGNode *x, A_exp *ast_root)
 {
 	register int op;
 	CSGNode y;
 
-	A_exp left_eql_exp = malloc(sizeof(A_exp));
-	left_eql_exp->next = NULL;
-	A_exp right_eql_exp = malloc(sizeof(A_exp));
-	left_eql_exp->next = NULL;
+	A_exp left_simp_exp = malloc(sizeof(A_exp));
+	left_simp_exp->next = NULL;
+	left_simp_exp->desig_next = NULL;
+	A_exp right_simp_exp = malloc(sizeof(A_exp));
+	right_simp_exp->next = NULL;
+	right_simp_exp->desig_next = NULL;
 
 	// SIMPLE EXP
-	SimpleExpression(x, left_eql_exp);
+	SimpleExpression(x, &left_simp_exp);
 
 	if ((sym == CSSlss) || (sym == CSSleq) || (sym == CSSgtr) || (sym == CSSgeq)) {
 
-		ast_root->kind = A_opExp;
-		ast_root->u.op.oper = malloc(sizeof(A_oper));
-		ast_root->u.op.oper->op = malloc(sizeof(S_symbol));
-		ast_root->u.op.oper->op->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+		(*ast_root)->kind = A_opExp;
+		(*ast_root)->u.op.oper = malloc(sizeof(A_oper));
+		(*ast_root)->u.op.oper->op = malloc(sizeof(S_symbol));
+		(*ast_root)->u.op.oper->op->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
 
 		switch (sym)
 		{
 		case CSSlss:
-			strcpy(ast_root->u.op.oper->op->name, "<");
+			strcpy((*ast_root)->u.op.oper->op->name, "<");
 			break;
 		case CSSleq:
-			strcpy(ast_root->u.op.oper->op->name, "<=");
+			strcpy((*ast_root)->u.op.oper->op->name, "<=");
 			break;
 		case CSSgtr:
-			strcpy(ast_root->u.op.oper->op->name, ">");
+			strcpy((*ast_root)->u.op.oper->op->name, ">");
 			break;
 		case CSSgeq:
-			strcpy(ast_root->u.op.oper->op->name, ">=");
+			strcpy((*ast_root)->u.op.oper->op->name, ">=");
 			break;
 		}
 
@@ -347,41 +353,43 @@ static void EqualityExpr(CSGNode *x, A_exp ast_root)
 		sym = CSSGet();
 
 		// SIMPLE EXP
-		SimpleExpression(&y, right_eql_exp);
+		SimpleExpression(&y, &right_simp_exp);
 
 		CSGRelation(op, x, y);
 
-		ast_root->u.op.left = left_eql_exp;
-		ast_root->u.op.right = right_eql_exp;
+		(*ast_root)->u.op.left = left_simp_exp;
+		(*ast_root)->u.op.right = right_simp_exp;
 	}
 	else
 	{
-		ast_root = left_eql_exp;
+		(*ast_root) =left_simp_exp;
 	}
 }
 
-static void Expression(CSGNode *x, A_exp ast_root)
+static void Expression(CSGNode *x, A_exp *ast_root)
 {
 	register int op;
 	CSGNode y;
 
 	A_exp left_eql_exp = malloc(sizeof(A_exp));
 	left_eql_exp->next = NULL;
+	left_eql_exp->desig_next = NULL;
 	A_exp right_eql_exp = malloc(sizeof(A_exp));
-	left_eql_exp->next = NULL;
+	right_eql_exp->next = NULL;
+	right_eql_exp->desig_next = NULL;
 
 	// EQUAL EXPR
-	EqualityExpr(x, left_eql_exp);
+	EqualityExpr(x, &left_eql_exp);
 
 	if ((sym == CSSeql) || (sym == CSSneq)) {
-		ast_root->kind = A_opExp;
-		ast_root->u.op.oper = malloc(sizeof(A_oper));
-		ast_root->u.op.oper->op = malloc(sizeof(S_symbol));
-		ast_root->u.op.oper->op->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+		(*ast_root)->kind = A_opExp;
+		(*ast_root)->u.op.oper = malloc(sizeof(A_oper));
+		(*ast_root)->u.op.oper->op = malloc(sizeof(S_symbol));
+		(*ast_root)->u.op.oper->op->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
 		if (sym == CSSeql)
-			strcpy(ast_root->u.op.oper->op->name, "==");
+			strcpy((*ast_root)->u.op.oper->op->name, "==");
 		else
-			strcpy(ast_root->u.op.oper->op->name, "!=");
+			strcpy((*ast_root)->u.op.oper->op->name, "!=");
 
 		op = sym;
 		sym = CSSGet();
@@ -389,20 +397,20 @@ static void Expression(CSGNode *x, A_exp ast_root)
 		assert(y != NULL);
 
 		// EQUAL EXPR
-		EqualityExpr(&y, right_eql_exp);
+		EqualityExpr(&y, &right_eql_exp);
 
 		CSGRelation(op, x, y);
 
-		ast_root->u.op.left = left_eql_exp;
-		ast_root->u.op.right = right_eql_exp;
+		(*ast_root)->u.op.left = left_eql_exp;
+		(*ast_root)->u.op.right = right_eql_exp;
 	}
 	else
 	{
-		ast_root = left_eql_exp;
+		(*ast_root) =left_eql_exp;
 	}
 }
 
-static void ConstExpression(CSGNode *expr, A_exp ast_root)
+static void ConstExpression(CSGNode *expr, A_exp *ast_root)
 {
 	Expression(expr, ast_root);
 	if ((*expr)->class != CSGConst) CSSError("constant expression expected");
@@ -410,7 +418,7 @@ static void ConstExpression(CSGNode *expr, A_exp ast_root)
 
 /*************************************************************************/
 
-static void VariableDeclaration(CSGNode *root, A_exp ast_root);
+static void VariableDeclaration(CSGNode *root, A_exp *ast_root);
 
 static void FieldList(CSGType type)
 {
@@ -418,12 +426,13 @@ static void FieldList(CSGType type)
 
 	A_exp tmpAexp = malloc(sizeof(A_exp));
 	tmpAexp->next = NULL;
+	tmpAexp->desig_next = NULL;
 
 	// VARIABLE DECLAR
-	VariableDeclaration(&(type->fields), tmpAexp);
+	VariableDeclaration(&(type->fields), &tmpAexp);
 	while (sym != CSSrbrace) {
 		//VARIABLE DECLAR
-		VariableDeclaration(&(type->fields), tmpAexp);
+		VariableDeclaration(&(type->fields), &tmpAexp);
 	}
 	curr = type->fields;
 	if (curr == NULL) CSSError("empty structs are not allowed");
@@ -488,7 +497,7 @@ static void Type(CSGType *type)
 	}
 }
 
-static void RecurseArray(CSGType *type, A_exp ast_root)
+static void RecurseArray(CSGType *type, A_exp *ast_root)
 {
 	register CSGType typ;
 	CSGNode expr;
@@ -509,8 +518,9 @@ static void RecurseArray(CSGType *type, A_exp ast_root)
 
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
+		tmp->desig_next = NULL;
 
-		ast_root->next = tmp;
+		(*ast_root)->desig_next = tmp;
 
 		// RECUR ARR
 		RecurseArray(type, ast_root);
@@ -529,31 +539,32 @@ static void RecurseArray(CSGType *type, A_exp ast_root)
 	*type = typ;
 }
 
-static void IdentArray(CSGNode *root, CSGType type, A_exp ast_root)
+static void IdentArray(CSGNode *root, CSGType type, A_exp *ast_root)
 {
 	register CSGNode obj;
 
 	if (sym != CSSident) CSSError("identifier expected");
 	// IDENT
 	obj = AddToList(root, &CSSid);
-	strcpy(ast_root->u.var->name->name, CSSid);
+	strcpy((*ast_root)->u.var->name->name, CSSid);
 
 	sym = CSSGet();
 	if (sym == CSSlbrak) {
 
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
+		tmp->desig_next = NULL;
 
-		ast_root->next = tmp;
+		(*ast_root)->desig_next= tmp;
 
 		// RECUR ARR
-		RecurseArray(&type, ast_root->next);
+		RecurseArray(&type, &(*ast_root)->desig_next);
 	}
 	if (instruct == 0) tos -= type->size;
 	InitObj(obj, CSGVar, NULL, type, tos);
 }
 
-static void IdentList(CSGNode *root, CSGType type, A_expList ast_root_list)
+static void IdentList(CSGNode *root, CSGType type, A_expList *ast_root_list)
 {
 	A_exp tmp = malloc(sizeof(A_exp));
 	tmp->kind = A_varExp;
@@ -561,11 +572,13 @@ static void IdentList(CSGNode *root, CSGType type, A_expList ast_root_list)
 	tmp->u.var->name = malloc(sizeof(S_symbol));
 	tmp->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
 	tmp->next = NULL;
+	tmp->desig_next = NULL;
 
-	ast_root_list->start = tmp;
-	ast_root_list->end = tmp;
+	(*ast_root_list)->start = tmp;
+	(*ast_root_list)->end = tmp;
 
-	IdentArray(root, type, ast_root_list->end);
+	// IDENT ARR
+	IdentArray(root, type, &(*ast_root_list)->end);
 	
 	while (sym == CSScomma) {
 
@@ -575,39 +588,44 @@ static void IdentList(CSGNode *root, CSGType type, A_expList ast_root_list)
 		tmpi->u.var->name = malloc(sizeof(S_symbol));
 		tmpi->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
 		tmpi->next = NULL;
+		tmpi->desig_next = NULL;
 
-		ast_root_list->end->next = tmp;
-		ast_root_list->end = tmp;
+		(*ast_root_list)->end->next = tmp;
+		(*ast_root_list)->end = tmp;
 
 		sym = CSSGet();
-		IdentArray(root, type, ast_root_list->end);
+
+		// IDENT ARR
+		IdentArray(root, type, &(*ast_root_list)->end);
 	}
 }
 
-static void VariableDeclaration(CSGNode *root, A_exp ast_root)
+static void VariableDeclaration(CSGNode *root, A_exp *ast_root)
 {
 	CSGType type;
 
 	Type(&type);
 
-	ast_root->kind = A_arrayExp;
-	ast_root->u.arr = malloc(sizeof(A_expList));
-	IdentList(root, type, ast_root->u.arr);
+	(*ast_root)->kind = A_arrayExp;
+	(*ast_root)->u.arr = malloc(sizeof(A_expList));
+
+	// IDENT LIST
+	IdentList(root, type, &(*ast_root)->u.arr);
 
 	if (sym != CSSsemicolon) CSSError("';' expected");
 	sym = CSSGet();
 }
 
-static void ConstantDeclaration(CSGNode *root, A_exp ast_root)
+static void ConstantDeclaration(CSGNode *root, A_exp *ast_root)
 {
-	ast_root->kind = A_assignExp;
-	ast_root->u.assign.var = malloc(sizeof(A_exp));
-	ast_root->u.assign.var->kind = A_varExp;
-	ast_root->u.assign.var->u.var = malloc(sizeof(A_exp));
-	ast_root->u.assign.var->u.var->name = (char*) malloc(sizeof(S_symbol));
-	ast_root->u.assign.var->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+	(*ast_root)->kind = A_assignExp;
+	(*ast_root)->u.assign.var = malloc(sizeof(A_exp));
+	(*ast_root)->u.assign.var->kind = A_varExp;
+	(*ast_root)->u.assign.var->u.var = malloc(sizeof(A_exp));
+	(*ast_root)->u.assign.var->u.var->name = malloc(sizeof(S_symbol));
+	(*ast_root)->u.assign.var->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
 
-	ast_root->u.assign.exp = malloc(sizeof(A_exp));
+	(*ast_root)->u.assign.exp = malloc(sizeof(A_exp));
 
 
 	register CSGNode obj;
@@ -628,14 +646,14 @@ static void ConstantDeclaration(CSGNode *root, A_exp ast_root)
 
 	// IDENT
 	strcpy(id, CSSid);
-	strcpy(ast_root->u.assign.var->u.var->name->name, CSSid);
+	strcpy((*ast_root)->u.assign.var->u.var->name->name, CSSid);
 	
 	sym = CSSGet();
 	if (sym != CSSbecomes) CSSError("'=' expected");
 	sym = CSSGet();
 
 	// CONSTANT EXP
-	ConstExpression(&expr, ast_root->u.assign.exp);
+	ConstExpression(&expr, &(*ast_root)->u.assign.exp);
 
 	if (expr->type != CSGlongType) CSSError("constant long expression required");
 	obj = AddToList(root, &id);
@@ -646,14 +664,14 @@ static void ConstantDeclaration(CSGNode *root, A_exp ast_root)
 
 /*************************************************************************/
 
-static void DesignatorM(CSGNode *x, A_exp ast_root)
+static void DesignatorM(CSGNode *x, A_exp *ast_root)
 {
 	register CSGNode obj;
 	CSGNode y;
 
 	// CSSident already consumed
 	while ((sym == CSSperiod) || (sym == CSSlbrak)) {
-		// Continue digging
+		// Ident
 		if (sym == CSSperiod) {
 			sym = CSSGet();
 			if ((*x)->type->form != CSGStruct) CSSError("struct type expected");
@@ -662,15 +680,19 @@ static void DesignatorM(CSGNode *x, A_exp ast_root)
 
 			A_exp tmp = malloc(sizeof(A_exp));
 			tmp->kind = A_varExp;
-			tmp->u.var = malloc(sizeof(S_symbol));
+			tmp->u.var = malloc(sizeof(A_var));
 			tmp->u.var->name = malloc(sizeof(S_symbol));
 			tmp->u.var->name->name = (char*)malloc(sizeof(char) * CHAR_SIZE);
 			strcpy(tmp->u.var->name->name, CSSid);
 			tmp->next = NULL;
+			tmp->desig_next = NULL;
 
-			A_exp pnt = ast_root;
-			while (pnt->next != NULL)
-				pnt = pnt->next;
+			A_exp pnt = (*ast_root);
+			pnt->next = NULL;
+			pnt->desig_next = NULL;
+
+			while (pnt->desig_next != NULL)
+				pnt = pnt->desig_next;
 
 			pnt->next = tmp;
 
@@ -678,7 +700,7 @@ static void DesignatorM(CSGNode *x, A_exp ast_root)
 			if (obj == NULL) CSSError("unknown identifier");
 			CSGField(x, obj);
 		}
-		// End
+		// Expression
 		else {
 			sym = CSSGet();
 			if ((*x)->type->form != CSGArray) CSSError("array type expected");
@@ -686,12 +708,17 @@ static void DesignatorM(CSGNode *x, A_exp ast_root)
 			assert(y != NULL);
 
 			A_exp tmp = malloc(sizeof(A_exp));
-			A_exp pnt = ast_root;
-			while (pnt->next != NULL)
-				pnt = pnt->next;
-			pnt->next = tmp;
+			tmp->next = NULL;
+			tmp->desig_next = NULL;
+
+			A_exp pnt = (*ast_root);
+
+			while (pnt->desig_next != NULL)
+				pnt = pnt->desig_next;
+			pnt->desig_next = tmp;
+			
 			// EXPRESSION
-			Expression(&y, pnt->next);
+			Expression(&y, &pnt->next);
 
 			CSGIndex(x, y);
 			if (sym != CSSrbrak) CSSError("']' expected");
@@ -700,7 +727,7 @@ static void DesignatorM(CSGNode *x, A_exp ast_root)
 	}
 }
 
-static void AssignmentM(CSGNode *x, A_exp ast_root)
+static void AssignmentM(CSGNode *x, A_exp *ast_root)
 {
 	CSGNode y;
 
@@ -711,25 +738,25 @@ static void AssignmentM(CSGNode *x, A_exp ast_root)
 	assert(y != NULL);
 
 	// DESIGNATOR
-	DesignatorM(x, ast_root->u.assign.var);
+	DesignatorM(x, &(*ast_root)->u.assign.var);
 
 	if (sym != CSSbecomes) CSSError("'=' expected");
 	sym = CSSGet();
 
 	// EXPRESSION
-	Expression(&y, ast_root->u.assign.exp);
+	Expression(&y, &(*ast_root)->u.assign.exp);
 
 	CSGStore(*x, y);
 	if (sym != CSSsemicolon) CSSError("';' expected");
 	sym = CSSGet();
 }
 
-static void ExpList(CSGNode proc, A_expList ast_root_list)
+static void ExpList(CSGNode proc, A_expList *ast_root_list)
 {
 	A_exp tmp = malloc(sizeof(A_exp));
 	tmp->next = NULL;
-	ast_root_list->start = tmp;
-	ast_root_list->end = tmp;
+	(*ast_root_list)->start = tmp;
+	(*ast_root_list)->end = tmp;
 
 	register CSGNode curr;
 	CSGNode x;
@@ -739,7 +766,7 @@ static void ExpList(CSGNode proc, A_expList ast_root_list)
 	curr = proc->dsc;
 
 	// EXPRESSION
-	Expression(&x, ast_root_list->end);
+	Expression(&x, &(*ast_root_list)->end);
 
 
 	if ((curr == NULL) || (curr->dsc != proc)) CSSError("too many parameters");
@@ -752,11 +779,11 @@ static void ExpList(CSGNode proc, A_expList ast_root_list)
 		sym = CSSGet();
 
 
-		// EXPRESSION
 		A_exp tmpi = malloc(sizeof(A_exp));
-		ast_root_list->end->next = tmpi;
-		ast_root_list->end = tmpi;
-		Expression(&x, ast_root_list->end);
+		(*ast_root_list)->end->next = tmpi;
+		(*ast_root_list)->end = tmpi;
+		// EXPRESSION
+		Expression(&x, &(*ast_root_list)->end);
 
 		if ((curr == NULL) || (curr->dsc != proc)) CSSError("too many parameters");
 		if (x->type != curr->type) CSSError("incorrect type");
@@ -766,7 +793,7 @@ static void ExpList(CSGNode proc, A_expList ast_root_list)
 	if ((curr != NULL) && (curr->dsc == proc)) CSSError("too few parameters");
 }
 
-static void ProcedureCallM(CSGNode obj, CSGNode *x, A_expList ast_root_list)
+static void ProcedureCallM(CSGNode obj, CSGNode *x, A_expList *ast_root_list)
 {
 	CSGNode y;
 
@@ -780,8 +807,9 @@ static void ProcedureCallM(CSGNode obj, CSGNode *x, A_expList ast_root_list)
 		
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
-		ast_root_list->start = tmp;
-		ast_root_list->end = tmp;
+		tmp->desig_next = NULL;
+		(*ast_root_list)->start = tmp;
+		(*ast_root_list)->end = tmp;
 
 		y = malloc(sizeof(CSGNodeDesc));
 		assert(y != NULL);
@@ -792,20 +820,21 @@ static void ProcedureCallM(CSGNode obj, CSGNode *x, A_expList ast_root_list)
 			CSGMakeNodeDesc(&y, obj);
 			sym = CSSGet();  // consume ident before calling Designator
 
-			ast_root_list->end->kind = A_varExp;
-			ast_root_list->end->u.var = malloc(sizeof(A_var));
-			ast_root_list->end->u.var->name = malloc(sizeof(S_symbol));
-			ast_root_list->end->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
-			ast_root_list->end->next = NULL;
-			strcpy(ast_root_list->end->u.var->name->name, CSSid);
+			(*ast_root_list)->end->kind = A_varExp;
+			(*ast_root_list)->end->u.var = malloc(sizeof(A_var));
+			(*ast_root_list)->end->u.var->name = malloc(sizeof(S_symbol));
+			(*ast_root_list)->end->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+			(*ast_root_list)->end->next = NULL;
+			(*ast_root_list)->end->desig_next = NULL;
+			strcpy((*ast_root_list)->end->u.var->name->name, CSSid);
 			// DESIGNATOR 
-			DesignatorM(&y, ast_root_list->end);
+			DesignatorM(&y, &(*ast_root_list)->end);
 
 		}
 		else if ((*x)->val == 2) {
 
 			// EXPRESSION
-			Expression(&y, ast_root_list->end);
+			Expression(&y, &(*ast_root_list)->end);
 		}
 		CSGIOCall(*x, y);
 	}
@@ -828,14 +857,14 @@ static void ProcedureCallM(CSGNode obj, CSGNode *x, A_expList ast_root_list)
 	sym = CSSGet();
 }
 
-static void StatementSequence(A_exp ast_root);
+static void StatementSequence(A_exp *ast_root);
 
-static void IfStatement(A_exp ast_root)
+static void IfStatement(A_exp *ast_root)
 {
-	ast_root->kind = A_ifExp;
-	ast_root->u.iff.test = malloc(sizeof(A_exp));
-	ast_root->u.iff.then = malloc(sizeof(A_exp));
-	ast_root->u.iff.elsee = malloc(sizeof(A_exp));
+	(*ast_root)->kind = A_ifExp;
+	(*ast_root)->u.iff.test = malloc(sizeof(A_exp));
+	(*ast_root)->u.iff.then = malloc(sizeof(A_exp));
+	(*ast_root)->u.iff.elsee = malloc(sizeof(A_exp));
 
 	CSGNode label;
 	CSGNode x;
@@ -850,7 +879,7 @@ static void IfStatement(A_exp ast_root)
 	
 	// IF
 	// EXPRESSION
-	Expression(&x, ast_root->u.iff.test);
+	Expression(&x, &(*ast_root)->u.iff.test);
 
 	CSGTestBool(&x);
 	CSGFixLink(x->false);
@@ -861,7 +890,7 @@ static void IfStatement(A_exp ast_root)
 
 	// THEN
 	// STATEMENT SEQUENCE
-	StatementSequence(ast_root->u.iff.then);
+	StatementSequence(&(*ast_root)->u.iff.then);
 
 	if (sym != CSSrbrace) CSSError("'}' expected");
 	sym = CSSGet();
@@ -875,7 +904,7 @@ static void IfStatement(A_exp ast_root)
 
 		// ELSE
 		// STATEMENT SEQUENCE
-		StatementSequence(ast_root->u.iff.elsee);
+		StatementSequence(&(*ast_root)->u.iff.elsee);
 
 		if (sym != CSSrbrace) CSSError("'}' expected");
 		sym = CSSGet();
@@ -886,11 +915,11 @@ static void IfStatement(A_exp ast_root)
 	CSGFixLink(label);
 }
 
-static void WhileStatement(A_exp ast_root)
+static void WhileStatement(A_exp *ast_root)
 {
-	ast_root->kind = A_whileExp;
-	ast_root->u.whilee.test = malloc(sizeof(A_exp));
-	ast_root->u.whilee.body = malloc(sizeof(A_exp));
+	(*ast_root)->kind = A_whileExp;
+	(*ast_root)->u.whilee.test = malloc(sizeof(A_exp));
+	(*ast_root)->u.whilee.body = malloc(sizeof(A_exp));
 
 	CSGNode label;
 	CSGNode x;
@@ -902,9 +931,10 @@ static void WhileStatement(A_exp ast_root)
 	if (sym != CSSlparen) CSSError("'(' expected");
 	sym = CSSGet();
 	CSGSetLabel(&label);
+
+	(*ast_root)->u.whilee.test->kind = A_opExp;
 	// EXPRESSION
-	ast_root->u.whilee.test->kind = A_opExp;
-	Expression(&x, ast_root->u.whilee.test);
+	Expression(&x, &(*ast_root)->u.whilee.test);
 
 	CSGTestBool(&x);
 	CSGFixLink(x->false);
@@ -912,9 +942,10 @@ static void WhileStatement(A_exp ast_root)
 	sym = CSSGet();
 	if (sym != CSSlbrace) CSSError("'{' expected");
 	sym = CSSGet();
+	
+	(*ast_root)->u.whilee.body->kind = A_arrayExp;
 	// STATEMENT SEQUENCCE
-	ast_root->u.whilee.body->kind = A_arrayExp;
-	StatementSequence(ast_root->u.whilee.body);
+	StatementSequence(&(*ast_root)->u.whilee.body);
 
 	if (sym != CSSrbrace) CSSError("'}' expected");
 	sym = CSSGet();
@@ -922,7 +953,7 @@ static void WhileStatement(A_exp ast_root)
 	CSGFixLink(x->true);
 }
 
-static void Statement(A_exp ast_root)
+static void Statement(A_exp *ast_root)
 {
 	register CSGNode obj;
 	CSGNode x;
@@ -949,29 +980,30 @@ static void Statement(A_exp ast_root)
 		assert(x != NULL);
 		if (sym == CSSlparen) {
 			// PROC_CALL
-			ast_root->kind = A_callExp;
-			ast_root->u.call.func = malloc(sizeof(S_symbol));
-			ast_root->u.call.func->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
-			strcpy(ast_root->u.call.func->name, CSSid);
-			ast_root->u.call.args = malloc(sizeof(A_exp));
-			ProcedureCallM(obj, &x, ast_root->u.call.args);
+			(*ast_root)->kind = A_callExp;
+			(*ast_root)->u.call.func = malloc(sizeof(S_symbol));
+			(*ast_root)->u.call.func->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+			strcpy((*ast_root)->u.call.func->name, CSSid);
+			(*ast_root)->u.call.args = malloc(sizeof(A_expList));
+			ProcedureCallM(obj, &x, &(*ast_root)->u.call.args);
 		}
 		else {
 			CSGMakeNodeDesc(&x, obj);
 			// ASSIGN
-			ast_root->kind = A_assignExp;
+			(*ast_root)->kind = A_assignExp;
 
 			A_exp tmp = malloc(sizeof(A_exp));
 			tmp->kind = A_varExp;
 			tmp->next = NULL;
+			tmp->desig_next = NULL;
 
 			tmp->u.var = malloc(sizeof(A_var));
 			tmp->u.var->name = malloc(sizeof(S_symbol));
 			tmp->u.var->name->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
 			strcpy(tmp->u.var->name->name, CSSid);
-			ast_root->u.assign.var = tmp;
+			(*ast_root)->u.assign.var = tmp;
 			
-			ast_root->u.assign.exp = malloc(sizeof(A_exp));
+			(*ast_root)->u.assign.exp = malloc(sizeof(A_exp));
 
 			AssignmentM(&x, ast_root);
 		}
@@ -980,21 +1012,23 @@ static void Statement(A_exp ast_root)
 	}
 }
 
-static void StatementSequence(A_exp ast_root)
+static void StatementSequence(A_exp *ast_root)
 {
-	ast_root->kind = A_arrayExp;
-	ast_root->u.arr = malloc(sizeof(A_expList));
-	ast_root->u.arr->start = NULL;
-	ast_root->u.arr->end = NULL;
+	(*ast_root)->kind = A_arrayExp;
+	(*ast_root)->u.arr = malloc(sizeof(A_expList));
+	(*ast_root)->u.arr->start = NULL;
+	(*ast_root)->u.arr->end = NULL;
 	while (sym != CSSrbrace) {
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
-		if (ast_root->u.arr->start == NULL)
-			ast_root->u.arr->start = tmp;
+		tmp->desig_next = NULL;
+		if ((*ast_root)->u.arr->start == NULL)
+			(*ast_root)->u.arr->start = tmp;
 		else
-			ast_root->u.arr->end->next = tmp;
-		ast_root->u.arr->end = tmp;
-		Statement(ast_root->u.arr->end);
+			(*ast_root)->u.arr->end->next = tmp;
+		(*ast_root)->u.arr->end = tmp;
+		// STATEMENT
+		Statement(&(*ast_root)->u.arr->end);
 	}
 }
 
@@ -1036,7 +1070,7 @@ static void FormalParameters(CSGNode *root)
 	}
 }
 
-static void ProcedureHeading(CSGNode *proc, S_symbol func)
+static void ProcedureHeading(CSGNode *proc, S_symbol *func)
 {
 	CSSIdent name;
 
@@ -1055,14 +1089,13 @@ static void ProcedureHeading(CSGNode *proc, S_symbol func)
 	sym = CSSGet();
 	if (strcmp(name, "main") == 0) CSGEntryPoint();
 
-	func->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
-	strcpy(func->name, name);
+	strcpy((*func)->name, name);
 }
 
-static void ProcedureBody(CSGNode *proc, A_expList ast_root_list)
+static void ProcedureBody(CSGNode *proc, A_expList *ast_root_list)
 {
-	ast_root_list->start = NULL;
-	ast_root_list->end = NULL;
+	(*ast_root_list)->start = NULL;
+	(*ast_root_list)->end = NULL;
 
 	register int returnsize;
 	register CSGNode curr;
@@ -1072,17 +1105,22 @@ static void ProcedureBody(CSGNode *proc, A_expList ast_root_list)
 
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
-		if (ast_root_list->start == NULL)
-			ast_root_list->start = tmp;
+		tmp->desig_next = NULL;
+		if ((*ast_root_list)->start == NULL)
+			(*ast_root_list)->start = tmp;
 		else
-			ast_root_list->end->next = tmp;
-		ast_root_list->end = tmp;
+			(*ast_root_list)->end->next = tmp;
+		(*ast_root_list)->end = tmp;
 
 		if (sym == CSSconst) {
-			ConstantDeclaration(proc, ast_root_list->end);
+			
+			// CONST DECLAR
+			ConstantDeclaration(proc, &(*ast_root_list)->end);
 		}
 		else {
-			VariableDeclaration(proc, ast_root_list->end);
+
+			// VAR DECLAR
+			VariableDeclaration(proc, &(*ast_root_list)->end);
 		}
 	}
 
@@ -1100,14 +1138,16 @@ static void ProcedureBody(CSGNode *proc, A_expList ast_root_list)
 	A_exp tmp = malloc(sizeof(A_exp));
 	tmp->kind = A_arrayExp;
 	tmp->next = NULL;
+	tmp->desig_next = NULL;
 	
-	if (ast_root_list->start == NULL)
-		ast_root_list->start = tmp;
+	if ((*ast_root_list)->start == NULL)
+		(*ast_root_list)->start = tmp;
 	else
-		ast_root_list->end->next = tmp;
-	ast_root_list->end = tmp;
+		(*ast_root_list)->end->next = tmp;
+	(*ast_root_list)->end = tmp;
 
-	StatementSequence(ast_root_list->end);
+	// STATEMENT SEQ
+	StatementSequence(&(*ast_root_list)->end);
 	
 	if (strcmp((*proc)->name, "main") == 0) {
 		CSGClose();
@@ -1118,55 +1158,63 @@ static void ProcedureBody(CSGNode *proc, A_expList ast_root_list)
 	CSGAdjustLevel(-1);
 }
 
-static void ProcedureDeclaration(A_exp ast_root)
+static void ProcedureDeclaration(A_exp *ast_root)
 {
-	ast_root->kind = A_callExp;
+	(*ast_root)->kind = A_callExp;
 	
 	CSGNode proc;
 	assert(sym == CSSvoid);
 	sym = CSSGet();
 
-	ast_root->u.call.func = malloc(sizeof(S_symbol));
-	ProcedureHeading(&proc, ast_root->u.call.func);
+	(*ast_root)->u.call.func = malloc(sizeof(S_symbol));
+	(*ast_root)->u.call.func->name = (char*) malloc(sizeof(char) * CHAR_SIZE);
+
+	// PROC HEADING
+	ProcedureHeading(&proc, &(*ast_root)->u.call.func);
 
 	if (sym != CSSlbrace) CSSError("'{' expected");
 	sym = CSSGet();
 
-	ast_root->u.call.args = malloc(sizeof(A_expList));
-	ProcedureBody(&proc, ast_root->u.call.args);
+	(*ast_root)->u.call.args = malloc(sizeof(A_expList));
+	
+	// PROC BODY
+	ProcedureBody(&proc, &(*ast_root)->u.call.args);
 	
 	if (sym != CSSrbrace) CSSError("'}' expected");
 	sym = CSSGet();
 	proc->next = NULL;  // cut off rest of list
 }
 
-static void Program(A_exp ast_root)
+static void Program(A_exp *ast_root)
 {
 	
 	CSGOpen();
 	tos = 32768;
 	instruct = 0;
 
-	ast_root->kind = A_arrayExp;
+	(*ast_root)->kind = A_arrayExp;
 
-	ast_root->u.arr = malloc(sizeof(A_expList));
-	ast_root->u.arr->start = NULL;
-	ast_root->u.arr->end = NULL;
+	(*ast_root)->u.arr = malloc(sizeof(A_expList));
+	(*ast_root)->u.arr->start = NULL;
+	(*ast_root)->u.arr->end = NULL;
 	
 	while ((sym != CSSvoid) && (sym != CSSeof)) {
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
-		if (ast_root->u.arr->start == NULL)
-			ast_root->u.arr->start = tmp;
+		tmp->desig_next = NULL;
+		if ((*ast_root)->u.arr->start == NULL)
+			(*ast_root)->u.arr->start = tmp;
 		else
-			ast_root->u.arr->end->next = tmp;
-		ast_root->u.arr->end = tmp;
+			(*ast_root)->u.arr->end->next = tmp;
+		(*ast_root)->u.arr->end = tmp;
 
 		if (sym == CSSconst) {
-			ConstantDeclaration(&globscope, ast_root->u.arr->end);
+			// CONST DECLAR
+			ConstantDeclaration(&globscope, &(*ast_root)->u.arr->end);
 		}
 		else {
-			VariableDeclaration(&globscope, ast_root->u.arr->end);
+			// VAR DECLAR
+			VariableDeclaration(&globscope, &(*ast_root)->u.arr->end);
 		}
 		
 	}
@@ -1176,17 +1224,19 @@ static void Program(A_exp ast_root)
 	while (sym == CSSvoid) {
 		A_exp tmp = malloc(sizeof(A_exp));
 		tmp->next = NULL;
-		if (ast_root->u.arr->start == NULL)
+		tmp->desig_next = NULL;
+		if ((*ast_root)->u.arr->start == NULL)
 		{
-			ast_root->u.arr->start = tmp;
-			ast_root->u.arr->end = tmp;
+			(*ast_root)->u.arr->start = tmp;
+			(*ast_root)->u.arr->end = tmp;
 		}
 		else
 		{
-			ast_root->u.arr->end->next = tmp;
-			ast_root->u.arr->end = tmp;
+			(*ast_root)->u.arr->end->next = tmp;
+			(*ast_root)->u.arr->end = tmp;
 		}
-		ProcedureDeclaration(ast_root->u.arr->end);
+		// PROC DECLAR
+		ProcedureDeclaration(&(*ast_root)->u.arr->end);
 	}
 	if (sym != CSSeof) CSSError("unrecognized characters at end of file");
 }
@@ -1225,7 +1275,7 @@ static void InsertObj(CSGNode *root, signed char class, CSGType type, CSSIdent n
 	curr->lev = 0;
 }
 
-static void Compile(char *filename, A_exp ast_root)
+static void Compile(char *filename, A_exp *ast_root)
 {
 	printf("compiling %s\n", filename);
 
@@ -1243,13 +1293,167 @@ static void Compile(char *filename, A_exp ast_root)
 
 /*************************************************************************/
 
+void printGeneralAST(A_exp ast_root, int level);
+
+void printDesignator(A_exp ast_root, int level)
+{
+	if (ast_root == NULL)
+		return;
+
+	// Variable
+	if (ast_root->kind == A_varExp)
+	{
+		int i = 0;
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("%s\n", ast_root->u.var->name->name);
+		printDesignator(ast_root->next, level+1);
+	}
+	// Expression
+	else
+	{
+		A_exp pnt = ast_root;
+		int i = 0;
+		while (pnt != NULL)
+		{
+			printGeneralAST(pnt, level + i);
+			i++;
+			pnt = pnt->next;
+		}
+	}
+}
+
+void printGeneralAST(A_exp ast_root, int level)
+{
+	if (ast_root == NULL)
+		return;
+
+	int i = 0;
+	A_exp pnt;
+	switch (ast_root->kind)
+	{
+	// Variable
+	case A_varExp:
+		
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("Var: %s\n", ast_root->u.var->name->name);
+
+		if (ast_root->next != NULL)
+			printDesignator(ast_root->next, level+1);
+		break;
+
+	// Int
+	case A_intExp:
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("Int: %d\n", ast_root->u.intt);
+		break;
+
+	// Calling
+	case A_callExp:
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("Call: %s\n", ast_root->u.call.func->name);
+
+		pnt = ast_root->u.call.args->start;
+		while (pnt != NULL)
+		{
+			printGeneralAST(pnt, level+1);
+			pnt = pnt->next;
+		}
+		break;
+
+	// OPERATION 
+	case A_opExp:
+		// Right
+		printGeneralAST(ast_root->u.op.right, level+1);
+
+		// Oper
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("%s\n", ast_root->u.op.oper->op->name);
+
+		// Left
+		printGeneralAST(ast_root->u.op.right, level+1);
+		break;
+
+	// ASSIGN
+	case A_assignExp:
+		// EXP
+		printGeneralAST(ast_root->u.assign.exp, level + 1);
+
+		// Oper
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("=\n");
+
+		// VAR
+		printGeneralAST(ast_root->u.assign.var, level + 1);
+		break;
+
+	case A_ifExp:
+		// IF
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("IF:\n");
+		printGeneralAST(ast_root->u.iff.test, level + 1);
+
+		// THEN
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("THEN:\n");
+		printGeneralAST(ast_root->u.iff.then, level + 1);
+
+		// ELSE
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("IF:\n");
+		printGeneralAST(ast_root->u.iff.elsee, level + 1);
+		break;
+
+	case A_whileExp:
+		// TEST
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("WHILE:\n");
+		printGeneralAST(ast_root->u.whilee.test, level + 1);
+
+		// BODY
+		for (i = 0; i < level; i++)
+			printf("\t");
+		printf("BODY:\n");
+		printGeneralAST(ast_root->u.whilee.body, level + 1);
+		break;
+
+	case A_arrayExp:
+		pnt = ast_root->u.arr->start;
+		while (pnt != NULL)
+		{
+			printGeneralAST(pnt, level + 1);
+			pnt = pnt->next;
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
 
 int main(int argc, char *argv [])
 {
-	CSGInit();
 	A_exp ast_root = malloc(sizeof(A_exp));
-	Compile("samples/qsort.cs", ast_root);
+	ast_root->next = NULL;
+	ast_root->desig_next = NULL;
 
+	CSGInit();
+
+	Compile("samples/qsort.cs", &ast_root);
+	printf("Helloword1\n");
+
+
+	printGeneralAST(ast_root, 0);
 	getchar();
 	return 0;
 }

@@ -24,6 +24,7 @@ struct A_exp_
 		A_expList arr;
 	} u;
 	A_exp next;
+	A_exp desig_next;
 };
 
 struct A_expList_
