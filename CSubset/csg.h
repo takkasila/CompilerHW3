@@ -5,7 +5,10 @@
 
 /* class & class */
 enum { CSGVar, CSGConst, CSGFld, CSGTyp, CSGProc, CSGSProc, CSGAddr, CSGInst };
-
+enum {
+	ineg, iadd, isub, imul, idiv, imod, iparam, ienter, ileave, iend, iload, istore, imove,
+	icmpeq, icmplt, icmple, iblbs, iblbc, icall, ibr, iret, iread, iwrite, iwrl, inop
+};
 /* form */
 enum { CSGInteger, CSGBoolean, CSGArray, CSGStruct };
 

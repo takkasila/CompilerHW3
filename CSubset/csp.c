@@ -10,7 +10,7 @@
 #include "csg.h"
 // #include "cfg.h"
 #include "ast.h"
-#include "ic.h"
+#include "ir.h"
 
 static int sym;
 static int instruct;
@@ -914,7 +914,7 @@ void print_tree(int level, A_exp root){
                     printf("-\n");
                     break;
                 case CSSeql:
-                    printf("=\n");
+                    printf("==\n");
                     break;
                 case CSSneq:
                     printf("!=\n");
@@ -1023,7 +1023,7 @@ int main(int argc, char *argv[])
       print_tree(0, it->exp);
       
   }
-  traverse(exps);
+  // traverse(exps);
   
   
   
