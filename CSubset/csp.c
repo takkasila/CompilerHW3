@@ -10,7 +10,7 @@
 #include "csg.h"
 // #include "cfg.h"
 #include "ast.h"
-// #include "ir.h"
+#include "ic.h"
 
 static int sym;
 static int instruct;
@@ -955,7 +955,7 @@ void print_tree(int level, A_exp root){
                 case CSSif: printf("if\n"); break;
 
                 default:
-                    printf("found :D %d\n", root->u.op.oper);
+                  break;
             }
             print_tree(level + 1, root->u.op.left);
             if(root->kind != A_op1Exp) print_tree(level + 1, root->u.op.right);
@@ -978,6 +978,7 @@ void print_tree(int level, A_exp root){
             }
             break;
         case A_whileExp:
+            
             printf("while\n");
             print_tree(level + 1, root->u.whilee.test);
             for(A_expList it = root->u.whilee.body; it; it = it->next){
@@ -1001,7 +1002,7 @@ void print_tree(int level, A_exp root){
             }
             break;
         default:
-            printf("what?\n");
+            break;
     }
 }
 
@@ -1016,21 +1017,15 @@ int main(int argc, char *argv[])
   } else {
     Compile("test.c");
   }
-  // CSGDecode();
-  
-  // keep backup for old code
-  // CSGNode old_code = code;
-  
-  // test print the tree :D
+ 
   for(A_expList it = exps; it; it = it->next){
+      // printf(">> %s\n",it->exp->u.call.func);
       print_tree(0, it->exp);
+      
   }
-  // use new one :D
-
-  // do_gen_ir(exps);
-
-  // blocks = genCFG();
-  // print_CFG(blocks);
-
+  traverse(exps);
+  
+  
+  
   return 0;
 }
